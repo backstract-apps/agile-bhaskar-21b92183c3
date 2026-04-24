@@ -25,15 +25,11 @@ runs:
         STREAM_TOKEN: ${{ inputs.token }}
       run: |
         #!/usr/bin/env bash
-        set -eo pipefail
 
-        buffer=()
-
-        flush() {
-          if [ "${#buffer[@]}" -eq 0 ]; then
-            return
-          fi
-
+        # Function to send logs to the API
+        send_logs() {
+          local log_payload="$1"
+          local json
           json=$(jq -nc \
             --arg run_id "$GITHUB_RUN_ID" \
             --arg step "$STEP_NAME" \
@@ -41,49 +37,43 @@ runs:
             --arg branch "$GITHUB_REF_NAME" \
             --arg commit_sha "$GITHUB_SHA" \
             --arg actor "$GITHUB_ACTOR" \
-            --argjson logs "$(printf '%s\n' "${buffer[@]}" | jq -R . | jq -s .)" \
+            --argjson logs "$log_payload" \
             '{run_id: $run_id, step: $step, repository: $repo, branch: $branch, commit_sha: $commit_sha, actor: $actor, logs: $logs}')
 
-          curl -s -X POST "$STREAM_ENDPOINT" \
+          # -m 5 ensures curl gives up after 5s if server hangs
+          curl -s -m 5 -X POST "$STREAM_ENDPOINT" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $STREAM_TOKEN" \
             -d "$json" > /dev/null || true
-
-          buffer=()
         }
 
-        command_exit_code=0
-        temp_file=$(mktemp)
+        export -f send_logs
+        export STEP_NAME STREAM_ENDPOINT STREAM_TOKEN GITHUB_RUN_ID GITHUB_REPOSITORY GITHUB_REF_NAME GITHUB_SHA GITHUB_ACTOR
+
         script_file=$(mktemp)
-
-        trap 'rm -f "$temp_file" "$script_file"' EXIT
-
-        # Write command safely into temp script
         cat <<'EOF' > "$script_file"
         ${{ inputs.command }}
         EOF
-
         chmod +x "$script_file"
 
+        # Execute and stream logs in chunks of 100 lines to reduce HTTP overhead
+        # This pipes STDOUT/STDERR directly into AWK for real-time processing
         set +e
-        bash "$script_file" 2>&1 | tee "$temp_file"
+        bash "$script_file" 2>&1 | awk '{
+            print $0;
+            if (buffer == "") { buffer = $0 } else { buffer = buffer "\n" $0 }
+            count++;
+            if (count >= 100) {
+                system("printf %s " q buffer q " | jq -Rs . | jq -cs . | xargs -0 -I {} bash -c \"send_logs '\''{}'\''\"")
+                buffer = "";
+                count = 0;
+            }
+        } END {
+            if (count > 0) {
+                system("printf %s " q buffer q " | jq -Rs . | jq -cs . | xargs -0 -I {} bash -c \"send_logs '\''{}'\''\"")
+            }
+        }' q="'"
+        
         command_exit_code="${PIPESTATUS[0]}"
-        set -e
-
-        while IFS= read -r line; do
-          buffer+=("$line")
-          if [ "${#buffer[@]}" -ge 10 ]; then
-            flush
-          fi
-        done < "$temp_file"
-
-        flush
-
-        if [[ "$STEP_NAME" == "Deploy to AWS EKS Cluster" ]]; then
-          if [ "${#buffer[@]}" -eq 0 ]; then
-            buffer+=("Step completed with exit code: $command_exit_code")
-          fi
-          flush
-        fi
-
+        rm -f "$script_file"
         exit "$command_exit_code"
