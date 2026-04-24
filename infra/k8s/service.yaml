@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agile-bhaskar-21b92183c3-srv
+  namespace: apps-prod
+spec:
+  selector:
+    app: agile-bhaskar-21b92183c3
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 7070
+  type: ClusterIP
