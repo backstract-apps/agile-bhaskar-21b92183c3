@@ -19,30 +19,28 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Setup job
-      # uses: ./.github/actions/log-streamer
-      # with:
-      #   step_name: "Setup job"
-      #   command: |
-      run: |
+      uses: ./.github/actions/log-streamer
+      with:
+        step_name: "Setup job"
+        command: |
           echo "Runner environment: $(uname -a)"
           echo "Disk space: $(df -h / | tail -1)"
           echo "Memory: $(free -h)"
-      #   endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
-      #   token: none
+        endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
+        token: none
 
     - name: Checkout code
-      # uses: ./.github/actions/log-streamer
-      # with:
-      #   step_name: "Checkout code"
-      #   command: |
-      run: |
+      uses: ./.github/actions/log-streamer
+      with:
+        step_name: "Checkout code"
+        command: |
           echo "Code checkout completed"
           echo "Repository: ${{ github.repository }}"
           echo "Branch: ${{ github.ref_name }}"
           echo "Commit SHA: ${{ github.sha }}"
           ls -la
-      #   endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
-      #   token: none
+        endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
+        token: none
 
     - name: Install kubectl
       uses: azure/setup-kubectl@v4
@@ -75,43 +73,40 @@ jobs:
 
     # 🚀 Build image
     - name: Build Docker image
-      # uses: ./.github/actions/log-streamer
-      # with:
-      #   step_name: "Build, tag, and push docker image"
-      #   command: |
-      run: |
+      uses: ./.github/actions/log-streamer
+      with:
+        step_name: "Build, tag, and push docker image"
+        command: |
           docker buildx build \
             --cache-from=type=gha \
             --cache-to=type=gha,mode=max \
             -t ${{ steps.login-ecr.outputs.registry }}/backstract_apps:${{ github.sha }} \
-            -t ${{ steps.login-ecr.outputs.registry }}/backstract_apps:agile-bhaskar-21b92183c3 \
+            -t ${{ steps.login-ecr.outputs.registry }}/backstract_apps:brave-torvalds-40da4cdc43 \
             -t ${{ steps.login-ecr.outputs.registry }}/backstract_apps:latest \
             --load .
-      #   endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
-      #   token: none
+        endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
+        token: none
 
     # 🚀 Push ONLY required tags
     - name: Push Docker image to ECR
-      # uses: ./.github/actions/log-streamer
-      # with:
-      #   step_name: "Build, tag, and push docker image to Amazon ECR"
-      #   command: |
-      run: |
+      uses: ./.github/actions/log-streamer
+      with:
+        step_name: "Build, tag, and push docker image to Amazon ECR"
+        command: |
           docker push ${{ steps.login-ecr.outputs.registry }}/backstract_apps:${{ github.sha }}
           docker push ${{ steps.login-ecr.outputs.registry }}/backstract_apps:agile-bhaskar-21b92183c3
           docker push ${{ steps.login-ecr.outputs.registry }}/backstract_apps:latest
-      #   endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
-      #   token: none
+        endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
+        token: none
 
     - name: Update kubeconfig
-      # uses: ./.github/actions/log-streamer
-      # with:
-      #   step_name: "Update kube config to point to EKS"
-      #   command: |
-      run: |
+      uses: ./.github/actions/log-streamer
+      with:
+        step_name: "Update kube config to point to EKS"
+        command: |
           aws eks update-kubeconfig --name $EKS_CLUSTER --region $AWS_REGION
-      #   endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
-      #   token: none
+        endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
+        token: none
 
     - name: Create Kubernetes secret dynamically
       run: |
@@ -123,17 +118,13 @@ jobs:
           --dry-run=client -o yaml | kubectl apply -n $NAMESPACE -f -
 
     - name: Deploy to EKS ( $NAMESPACE namespace )
-      # uses: ./.github/actions/log-streamer
-      # env:
-      #   BST_TOKEN: ${{ secrets.BACKSTRACT_AUTH_TOKEN }}
-      #   INFRA_DIR: infra/k8s
-      # with:
-      #   step_name: "Deploy to AWS EKS Cluster"
-      #   command: |
+      uses: ./.github/actions/log-streamer
       env:
         BST_TOKEN: ${{ secrets.BACKSTRACT_AUTH_TOKEN }}
         INFRA_DIR: infra/k8s
-      run: |
+      with:
+        step_name: "Deploy to AWS EKS Cluster"
+        command: |
           if [ -z "${BST_TOKEN}" ]; then
             echo "ERROR: BACKSTRACT_AUTH_TOKEN is empty"
             exit 1
@@ -208,5 +199,5 @@ jobs:
 
           echo "📦 Pods:"
           kubectl get pods -n $NAMESPACE -l "app=agile-bhaskar-21b92183c3"
-      #   endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
-      #   token: ${{ secrets.BACKSTRACT_AUTH_TOKEN }}
+        endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
+        token: ${{ secrets.BACKSTRACT_AUTH_TOKEN }}
