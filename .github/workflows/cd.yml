@@ -84,7 +84,7 @@ jobs:
             --cache-from=type=gha \
             --cache-to=type=gha,mode=max \
             -t ${{ steps.login-ecr.outputs.registry }}/backstract_apps:${{ github.sha }} \
-            -t ${{ steps.login-ecr.outputs.registry }}/backstract_apps:brave-torvalds-40da4cdc43 \
+            -t ${{ steps.login-ecr.outputs.registry }}/backstract_apps:agile-bhaskar-21b92183c3 \
             -t ${{ steps.login-ecr.outputs.registry }}/backstract_apps:latest \
             --load .
       #   endpoint: https://cc1fbde45ead-in-south-01.mayson.dev/sigma/api/v1/logs/github
